@@ -1,0 +1,27 @@
+SELECT 
+    fl.flight_id,
+    'Anapa' as departure_city, -- значние города вылета "по умолчанию"
+    (CASE WHEN fl.arrival_airport = 'SVO' THEN 'Moscow'
+             WHEN fl.arrival_airport = 'NOZ' THEN 'Novokeznetsk'
+             WHEN fl.arrival_airport = 'EGO' THEN 'Belgorod' END) as arrival_city,
+    a.model,
+    a.count_seats,
+    count(tfl.ticket_no) as count_ticket,
+    a.count_seats - count(tfl.ticket_no) as unfilled_places,
+    (date_part('hour', (fl.scheduled_arrival - fl.scheduled_departure))*60+date_part('minute', (fl.scheduled_arrival - fl.scheduled_departure))) as flight_duration_minute,
+    sum(tfl.amount)
+FROM dst_project.flights as fl
+    join dst_project.ticket_flights as tfl
+        on fl.flight_id = tfl.flight_id
+    join (
+            SELECT afl.aircraft_code, afl.model, count(sfl.seat_no) as count_seats -- подзапрос для сбора данных по количеству мест в каждой модели самолета
+            from dst_project.aircrafts as afl 
+                join dst_project.seats as sfl 
+                    on afl.aircraft_code = sfl.aircraft_code 
+            group by afl.aircraft_code, afl.model
+            ) a 
+        on fl.aircraft_code = a.aircraft_code
+WHERE fl.departure_airport = 'AAQ' 
+    AND (date_trunc('month', fl.scheduled_departure) in ('2017-01-01','2017-02-01', '2017-12-01'))
+    AND fl.status not in ('Cancelled')
+group by fl.flight_id, departure_city, arrival_city, a.model, a.count_seats
